@@ -9,9 +9,10 @@ import {
   ShieldOff,
   ShieldCheck,
   Lock,
+  UserCog,
 } from 'lucide-react';
 
-import { setAccountStatus } from '../actions';
+import { setAccountStatus, setMemberRole } from '../actions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -28,7 +29,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -43,6 +49,7 @@ import { Card } from '@/components/ui/card';
 import { getDict, type Lang } from '@/lib/i18n';
 import {
   ACCOUNT_MANAGER_ROLES,
+  ASSIGNABLE_ROLES,
   type Profile,
   type UserRole,
 } from '@/lib/types';
@@ -70,8 +77,14 @@ export function MembersTable({
   const [isPending, startTransition] = useTransition();
 
   // VP (and anyone else outside sys_admin/president) sees the roster but has
-  // no status controls — mirrored server-side and in the database trigger.
+  // no status/role controls — mirrored server-side and in the database trigger.
   const canManageAccounts = ACCOUNT_MANAGER_ROLES.includes(viewerRole);
+
+  // Only sys_admin can install a President (mirrors the approvals rule).
+  const roleOptions =
+    viewerRole === 'sys_admin'
+      ? ASSIGNABLE_ROLES
+      : ASSIGNABLE_ROLES.filter((r) => r !== 'president');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -115,6 +128,20 @@ export function MembersTable({
         text: result.ok
           ? result.message ?? 'Status updated.'
           : result.error ?? 'Status change failed.',
+      });
+    });
+  }
+
+  function handleRoleChange(member: Profile, newRole: UserRole) {
+    if (newRole === member.role) return;
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await setMemberRole(member.id, newRole);
+      setFeedback({
+        ok: result.ok,
+        text: result.ok
+          ? `${member.first_name} ${member.last_name}: ${d.members.roleChanged} ${d.roles[newRole]}.`
+          : result.error ?? 'Role change failed.',
       });
     });
   }
@@ -205,6 +232,27 @@ export function MembersTable({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <UserCog />
+                                {d.members.changeRole}
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                <DropdownMenuRadioGroup
+                                  value={member.role}
+                                  onValueChange={(value) =>
+                                    handleRoleChange(member, value as UserRole)
+                                  }
+                                >
+                                  {roleOptions.map((role) => (
+                                    <DropdownMenuRadioItem key={role} value={role}>
+                                      {d.roles[role]}
+                                    </DropdownMenuRadioItem>
+                                  ))}
+                                </DropdownMenuRadioGroup>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                            <DropdownMenuSeparator />
                             <DropdownMenuLabel>
                               {d.members.accountStatus}
                             </DropdownMenuLabel>

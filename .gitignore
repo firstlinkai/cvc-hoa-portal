@@ -34,3 +34,6 @@ Keys for Env.txt
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
+.env*

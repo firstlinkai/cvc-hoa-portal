@@ -189,6 +189,69 @@ export async function setAccountStatus(
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   ROLE MANAGEMENT — sys_admin & president ONLY (VP excluded, like statuses)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export async function setMemberRole(
+  userId: string,
+  newRole: UserRole
+): Promise<ActionResult> {
+  const { supabase, profile, error } = await requireRole(ACCOUNT_MANAGER_ROLES);
+  if (error || !profile) return { ok: false, error: error ?? 'Unauthorized.' };
+
+  if (userId === profile.id) {
+    return { ok: false, error: 'You cannot change your own role.' };
+  }
+
+  if (!ASSIGNABLE_ROLES.includes(newRole)) {
+    return { ok: false, error: 'That role cannot be assigned.' };
+  }
+
+  // Only sys_admin may install a President (mirrors the approvals rule).
+  if (newRole === 'president' && profile.role !== 'sys_admin') {
+    return { ok: false, error: 'Only the System Admin can assign the President role.' };
+  }
+
+  const { data: target } = await supabase
+    .from('profiles')
+    .select('id, role')
+    .eq('id', userId)
+    .single<Pick<Profile, 'id' | 'role'>>();
+
+  if (!target) return { ok: false, error: 'Member not found.' };
+
+  // Application-level mirror of the database guard: the President cannot
+  // touch sys_admin or other President accounts.
+  if (
+    profile.role === 'president' &&
+    (target.role === 'sys_admin' || target.role === 'president')
+  ) {
+    return {
+      ok: false,
+      error: 'The President cannot modify System Admin or President accounts.',
+    };
+  }
+
+  // Runs with the CALLER's JWT — RLS + tr_profiles_guard enforce the same
+  // rules at the database level.
+  const { data: updated, error: updateError } = await supabase
+    .from('profiles')
+    .update({ role: newRole })
+    .eq('id', userId)
+    .select('id');
+
+  if (updateError) {
+    return { ok: false, error: `Role change failed: ${updateError.message}` };
+  }
+  if (!updated || updated.length === 0) {
+    return { ok: false, error: 'Role change was rejected.' };
+  }
+
+  revalidatePath('/dashboard/admin/members');
+  return { ok: true, message: 'Role updated.' };
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    DOCUMENT UPLOAD (staged as pending_review / is_published = false)
    ══════════════════════════════════════════════════════════════════════════ */
 
