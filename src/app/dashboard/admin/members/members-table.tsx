@@ -9,10 +9,11 @@ import {
   ShieldOff,
   ShieldCheck,
   Lock,
+  Trash2,
   UserCog,
 } from 'lucide-react';
 
-import { setAccountStatus, setMemberRole } from '../actions';
+import { deleteMember, setAccountStatus, setMemberRole } from '../actions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -72,7 +73,7 @@ export function MembersTable({
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{
     member: Profile;
-    nextStatus: 'active' | 'deactivated';
+    action: 'activate' | 'deactivate' | 'delete';
   } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -118,16 +119,22 @@ export function MembersTable({
 
   function handleConfirm() {
     if (!confirmTarget) return;
-    const { member, nextStatus } = confirmTarget;
+    const { member, action } = confirmTarget;
     setConfirmTarget(null);
     setFeedback(null);
     startTransition(async () => {
-      const result = await setAccountStatus(member.id, nextStatus);
+      const result =
+        action === 'delete'
+          ? await deleteMember(member.id)
+          : await setAccountStatus(
+              member.id,
+              action === 'activate' ? 'active' : 'deactivated'
+            );
       setFeedback({
         ok: result.ok,
         text: result.ok
-          ? result.message ?? 'Status updated.'
-          : result.error ?? 'Status change failed.',
+          ? result.message ?? 'Done.'
+          : result.error ?? 'Action failed.',
       });
     });
   }
@@ -262,7 +269,7 @@ export function MembersTable({
                                 onClick={() =>
                                   setConfirmTarget({
                                     member,
-                                    nextStatus: 'active',
+                                    action: 'activate',
                                   })
                                 }
                               >
@@ -276,13 +283,30 @@ export function MembersTable({
                                 onClick={() =>
                                   setConfirmTarget({
                                     member,
-                                    nextStatus: 'deactivated',
+                                    action: 'deactivate',
                                   })
                                 }
                               >
                                 <ShieldOff />
                                 {d.members.deactivate}
                               </DropdownMenuItem>
+                            )}
+                            {viewerRole === 'sys_admin' && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-red-600 focus:text-red-600"
+                                  onClick={() =>
+                                    setConfirmTarget({
+                                      member,
+                                      action: 'delete',
+                                    })
+                                  }
+                                >
+                                  <Trash2 />
+                                  {d.members.deleteMember}
+                                </DropdownMenuItem>
+                              </>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -309,9 +333,11 @@ export function MembersTable({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {confirmTarget?.nextStatus === 'deactivated'
-                ? d.members.confirmDeactivateTitle
-                : d.members.confirmActivateTitle}
+              {confirmTarget?.action === 'delete'
+                ? d.members.confirmDeleteTitle
+                : confirmTarget?.action === 'deactivate'
+                  ? d.members.confirmDeactivateTitle
+                  : d.members.confirmActivateTitle}
             </DialogTitle>
             <DialogDescription>
               {confirmTarget && (
@@ -323,9 +349,11 @@ export function MembersTable({
                   (Phase {confirmTarget.member.phase}, Block{' '}
                   {confirmTarget.member.block}, Lot {confirmTarget.member.lot}
                   ) —{' '}
-                  {confirmTarget.nextStatus === 'deactivated'
-                    ? d.members.deactivateBody
-                    : d.members.activateBody}
+                  {confirmTarget.action === 'delete'
+                    ? d.members.deleteBody
+                    : confirmTarget.action === 'deactivate'
+                      ? d.members.deactivateBody
+                      : d.members.activateBody}
                 </>
               )}
             </DialogDescription>
@@ -336,15 +364,15 @@ export function MembersTable({
             </Button>
             <Button
               variant={
-                confirmTarget?.nextStatus === 'deactivated'
-                  ? 'destructive'
-                  : 'default'
+                confirmTarget?.action === 'activate' ? 'default' : 'destructive'
               }
               onClick={handleConfirm}
             >
-              {confirmTarget?.nextStatus === 'deactivated'
-                ? d.members.deactivateBtn
-                : d.members.activateBtn}
+              {confirmTarget?.action === 'delete'
+                ? d.members.deleteBtn
+                : confirmTarget?.action === 'deactivate'
+                  ? d.members.deactivateBtn
+                  : d.members.activateBtn}
             </Button>
           </DialogFooter>
         </DialogContent>

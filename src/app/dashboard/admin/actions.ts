@@ -189,6 +189,54 @@ export async function setAccountStatus(
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   PERMANENT DELETION — sys_admin ONLY (global override per the PRD)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export async function deleteMember(userId: string): Promise<ActionResult> {
+  const { profile, error } = await requireRole(['sys_admin']);
+  if (error || !profile) return { ok: false, error: error ?? 'Unauthorized.' };
+
+  if (userId === profile.id) {
+    return { ok: false, error: 'You cannot delete your own account.' };
+  }
+
+  const admin = createAdminClient();
+
+  const { data: target } = await admin
+    .from('profiles')
+    .select('id, first_name, last_name, email')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!target) return { ok: false, error: 'Member not found.' };
+
+  // Audit-trail guard: members with uploaded documents must be deactivated,
+  // not deleted — their rows anchor document provenance.
+  const { count } = await admin
+    .from('documents')
+    .select('id', { count: 'exact', head: true })
+    .eq('uploaded_by', userId);
+
+  if ((count ?? 0) > 0) {
+    return {
+      ok: false,
+      error: `This member has ${count} uploaded document(s). Deleting them would break the audit trail — keep the account deactivated instead.`,
+    };
+  }
+
+  const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
+  if (deleteError) {
+    return { ok: false, error: `Deletion failed: ${deleteError.message}` };
+  }
+
+  revalidatePath('/dashboard/admin/members');
+  return {
+    ok: true,
+    message: `${target.first_name} ${target.last_name} (${target.email}) permanently deleted.`,
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    ROLE MANAGEMENT — sys_admin & president ONLY (VP excluded, like statuses)
    ══════════════════════════════════════════════════════════════════════════ */
 

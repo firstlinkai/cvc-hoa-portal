@@ -169,6 +169,11 @@ const en = {
     deactivate: 'Deactivate account',
     changeRole: 'Change role',
     roleChanged: 'role updated to',
+    deleteMember: 'Delete member',
+    confirmDeleteTitle: 'Permanently delete this member?',
+    deleteBody:
+      'their account and profile will be permanently removed. This cannot be undone. If they have uploaded documents, deletion will be refused to protect the audit trail.',
+    deleteBtn: 'Delete Permanently',
     you: '(you)',
     confirmActivateTitle: 'Activate this account?',
     confirmDeactivateTitle: 'Deactivate this account?',
@@ -391,6 +396,11 @@ const tl: Dict = {
     deactivate: 'I-deactivate ang account',
     changeRole: 'Palitan ang role',
     roleChanged: 'napalitan ang role sa',
+    deleteMember: 'Burahin ang miyembro',
+    confirmDeleteTitle: 'Permanenteng burahin ang miyembrong ito?',
+    deleteBody:
+      'permanenteng buburahin ang kanilang account at profile. Hindi na ito maibabalik. Kung may na-upload silang dokumento, hindi matutuloy ang pagbura upang mapangalagaan ang audit trail.',
+    deleteBtn: 'Burahin nang Permanente',
     you: '(ikaw)',
     confirmActivateTitle: 'I-activate ang account na ito?',
     confirmDeactivateTitle: 'I-deactivate ang account na ito?',
