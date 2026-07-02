@@ -29,7 +29,9 @@ export async function login(
   formData: FormData
 ): Promise<AuthFormState> {
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
-  const password = String(formData.get('password') ?? '');
+  // Trim to absorb stray whitespace from copy-pasted credentials.
+  // Registration trims identically, so stored passwords never carry edges.
+  const password = String(formData.get('password') ?? '').trim();
   const redirectTo = sanitizeRedirect(formData.get('redirectTo'));
 
   if (!email || !password) {
@@ -44,7 +46,19 @@ export async function login(
   });
 
   if (signInError) {
-    return { error: 'Invalid email or password.' };
+    if (
+      signInError.status === 429 ||
+      signInError.code === 'over_request_rate_limit'
+    ) {
+      return {
+        error:
+          'Too many sign-in attempts. Please wait a minute and try again.',
+      };
+    }
+    if (signInError.code === 'invalid_credentials') {
+      return { error: 'Invalid email or password.' };
+    }
+    return { error: `Sign-in failed: ${signInError.message}` };
   }
 
   // Gatekeeper: only active accounts may proceed to the dashboard.
@@ -93,7 +107,7 @@ export async function register(
   formData: FormData
 ): Promise<AuthFormState> {
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
-  const password = String(formData.get('password') ?? '');
+  const password = String(formData.get('password') ?? '').trim();
   const firstName = String(formData.get('firstName') ?? '').trim();
   const lastName = String(formData.get('lastName') ?? '').trim();
   const phase = String(formData.get('phase') ?? '').trim();
